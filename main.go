@@ -59,7 +59,7 @@ var app = &cli.App{
 
 		sbuf := gopacket.NewSerializeBuffer()
 		for ns := range CaptureNeighSolicitation(h) {
-			if !acceptTarget.Contains(ns.TargetIP) {
+			if !ns.DestIP.IsMulticast() || !acceptTarget.Contains(ns.TargetIP) {
 				log.Println("IGNORE", ns)
 				continue
 			}

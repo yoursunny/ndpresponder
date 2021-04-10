@@ -34,13 +34,15 @@ var advertTypeCode = layers.CreateICMPv6TypeCode(layers.ICMPv6TypeNeighborAdvert
 type NeighSolicitation struct {
 	RouterMAC [6]byte
 	RouterIP  netaddr.IP
+	DestIP    netaddr.IP
 	TargetIP  netaddr.IP
 }
 
 func (ns NeighSolicitation) String() string {
-	return fmt.Sprintf("who has %s tell %s at %02x:%02x:%02x:%02x:%02x:%02x",
-		ns.TargetIP, ns.RouterIP,
-		ns.RouterMAC[0], ns.RouterMAC[1], ns.RouterMAC[2], ns.RouterMAC[3], ns.RouterMAC[4], ns.RouterMAC[5])
+	if ns.DestIP.IsMulticast() {
+		return fmt.Sprintf("who-has %s tell %s", ns.TargetIP, ns.RouterIP)
+	}
+	return fmt.Sprintf("is-alive %s tell %s", ns.TargetIP, ns.RouterIP)
 }
 
 // Respond creates an ICMPv6 neighbor advertisement packet.
@@ -107,6 +109,7 @@ func CaptureNeighSolicitation(src gopacket.ZeroCopyPacketDataSource) <-chan Neig
 				ns := NeighSolicitation{}
 				copy(ns.RouterMAC[:], eth.SrcMAC)
 				ns.RouterIP, _ = netaddr.FromStdIP(ip6.SrcIP)
+				ns.DestIP, _ = netaddr.FromStdIP(ip6.DstIP)
 				ns.TargetIP, _ = netaddr.FromStdIP(solicit.TargetAddress)
 				ch <- ns
 			}
