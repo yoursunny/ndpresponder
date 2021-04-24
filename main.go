@@ -1,20 +1,32 @@
 package main
 
 import (
-	"log"
+	"math/rand"
 	"net"
 	"os"
+	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/afpacket"
 	"github.com/urfave/cli/v2"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"inet.af/netaddr"
 )
 
+var logger = func() *zap.Logger {
+	core := zapcore.NewCore(
+		zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()),
+		os.Stderr,
+		zap.DebugLevel,
+	)
+	return zap.New(core)
+}()
+
 var (
-	netif        *net.Interface
-	acceptTarget *netaddr.IPSet
-	handle       *afpacket.TPacket
+	netif         *net.Interface
+	targetSubnets *netaddr.IPSet
+	handle        *afpacket.TPacket
 )
 
 var app = &cli.App{
@@ -23,12 +35,18 @@ var app = &cli.App{
 		&cli.StringFlag{
 			Name:     "ifname",
 			Aliases:  []string{"i"},
+			Usage:    "uplink network interface",
 			Required: true,
 		},
 		&cli.StringSliceFlag{
-			Name:     "subnet",
-			Aliases:  []string{"n"},
-			Required: true,
+			Name:    "subnet",
+			Aliases: []string{"n"},
+			Usage:   "static target subnet",
+		},
+		&cli.StringSliceFlag{
+			Name:    "docker-network",
+			Aliases: []string{"N"},
+			Usage:   "Docker network name",
 		},
 	},
 	Before: func(c *cli.Context) (e error) {
@@ -44,11 +62,17 @@ var app = &cli.App{
 			}
 			ipset.AddPrefix(prefix)
 		}
-		acceptTarget = ipset.IPSet()
+		targetSubnets = ipset.IPSet()
+
+		dockerNetworks = c.StringSlice("docker-network")
 
 		return nil
 	},
 	Action: func(c *cli.Context) error {
+		hi, e := gatherHostInfo()
+		if e != nil {
+			return cli.Exit(e, 1)
+		}
 		h, e := afpacket.NewTPacket(afpacket.OptInterface(netif.Name))
 		if e != nil {
 			return cli.Exit(e, 1)
@@ -56,21 +80,57 @@ var app = &cli.App{
 		if e = h.SetBPF(bpfFilter); e != nil {
 			return cli.Exit(e, 1)
 		}
+		solicitations := CaptureNeighSolicitation(h)
+
+		if len(dockerNetworks) > 0 {
+			if e = dockerListen(); e != nil {
+				return cli.Exit(e, 1)
+			}
+		}
 
 		sbuf := gopacket.NewSerializeBuffer()
-		for ns := range CaptureNeighSolicitation(h) {
-			if !ns.DestIP.IsMulticast() || !acceptTarget.Contains(ns.TargetIP) {
-				log.Println("IGNORE", ns)
-				continue
-			}
+	L:
+		for {
+			select {
+			case ns := <-solicitations:
+				logEntry := logger.With(zap.Stringer("ns", ns))
+				switch {
+				case dockerActiveIPs.Contains(ns.TargetIP):
+					logEntry = logEntry.With(zap.String("reason", "docker"))
+				case ns.DestIP.IsMulticast() && targetSubnets.Contains(ns.TargetIP):
+					logEntry = logEntry.With(zap.String("reason", "static"))
+				default:
+					logEntry.Debug("IGNORE")
+					continue L
+				}
 
-			log.Println("RESPOND", ns)
-			if e := ns.Respond(sbuf, netif.HardwareAddr); e != nil {
-				continue
+				if e := ns.Respond(sbuf, hi); e != nil {
+					logEntry.Warn("RESPOND error", zap.Error(e))
+					continue L
+				}
+				logEntry.Info("RESPOND")
+				h.WritePacketData(sbuf.Bytes())
+
+			case ip := <-dockerNewIP:
+				logEntry := logger.With(zap.Stringer("ip", ip))
+				if e := Gratuitous(sbuf, hi, ip); e != nil {
+					logEntry.Warn("GRATUITOUS error", zap.Error(e))
+					continue L
+				}
+				logEntry.Info("GRATUITOUS")
+				h.WritePacketData(sbuf.Bytes())
+
+				if hi.GatewayIP.IsZero() {
+					break
+				}
+				if e := Solicit(sbuf, hi, ip); e != nil {
+					logEntry.Warn("SOLICIT error", zap.Error(e))
+					continue L
+				}
+				logEntry.Info("SOLICIT")
+				h.WritePacketData(sbuf.Bytes())
 			}
-			h.WritePacketData(sbuf.Bytes())
 		}
-		return nil
 	},
 	After: func(c *cli.Context) error {
 		if handle != nil {
@@ -81,5 +141,6 @@ var app = &cli.App{
 }
 
 func main() {
+	rand.Seed(time.Now().UnixNano())
 	app.Run(os.Args)
 }

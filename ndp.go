@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"io"
@@ -27,8 +28,90 @@ var bpfFilter = []bpf.RawInstruction{
 	{0x6, 0, 0, 0x00040000},
 	{0x6, 0, 0, 0x00000000},
 }
-
+var packetSerializeOpts = gopacket.SerializeOptions{
+	FixLengths:       true,
+	ComputeChecksums: true,
+}
+var solicitTypeCode = layers.CreateICMPv6TypeCode(layers.ICMPv6TypeNeighborSolicitation, 0)
 var advertTypeCode = layers.CreateICMPv6TypeCode(layers.ICMPv6TypeNeighborAdvertisement, 0)
+
+// Gratuitous creates a gratuitous ICMPv6 neighbor solicitation packet.
+func Gratuitous(w gopacket.SerializeBuffer, hi HostInfo, targetIP netaddr.IP) error {
+	ip16 := targetIP.As16()
+	eth := layers.Ethernet{
+		SrcMAC:       hi.HostMAC,
+		DstMAC:       net.HardwareAddr{0x33, 0x33, 0xFF, ip16[13], ip16[14], ip16[15]},
+		EthernetType: layers.EthernetTypeIPv6,
+	}
+
+	dstIP := net.IP{0xFF, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x01, 0xFF, ip16[13], ip16[14], ip16[15]}
+	ip6 := layers.IPv6{
+		Version:    6,
+		SrcIP:      make(net.IP, net.IPv6len),
+		DstIP:      dstIP,
+		NextHeader: layers.IPProtocolICMPv6,
+		HopLimit:   math.MaxUint8,
+	}
+
+	icmp6 := layers.ICMPv6{
+		TypeCode: solicitTypeCode,
+	}
+	icmp6.SetNetworkLayerForChecksum(&ip6)
+
+	nonce := make([]byte, 6)
+	rand.Read(nonce)
+	solicit := layers.ICMPv6NeighborSolicitation{
+		TargetAddress: targetIP.IPAddr().IP,
+		Options: layers.ICMPv6Options{
+			{
+				Type: 0x0E,
+				Data: nonce,
+			},
+		},
+	}
+
+	return gopacket.SerializeLayers(w, packetSerializeOpts, &eth, &ip6, &icmp6, &solicit)
+
+}
+
+// Solicit creates an ICMPv6 neighbor solicitation packet.
+func Solicit(w gopacket.SerializeBuffer, hi HostInfo, sourceIP netaddr.IP) error {
+	eth := layers.Ethernet{
+		SrcMAC:       hi.HostMAC,
+		DstMAC:       net.HardwareAddr{0x33, 0x33, 0xFF, 0x00, 0x00, 0x01},
+		EthernetType: layers.EthernetTypeIPv6,
+	}
+
+	dstIP := net.IP{0xFF, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x01, 0xFF, 0x00, 0x00, 0x01}
+	ip6 := layers.IPv6{
+		Version:    6,
+		SrcIP:      sourceIP.IPAddr().IP,
+		DstIP:      dstIP,
+		NextHeader: layers.IPProtocolICMPv6,
+		HopLimit:   math.MaxUint8,
+	}
+
+	icmp6 := layers.ICMPv6{
+		TypeCode: solicitTypeCode,
+	}
+	icmp6.SetNetworkLayerForChecksum(&ip6)
+
+	nonce := make([]byte, 6)
+	rand.Read(nonce)
+	solicit := layers.ICMPv6NeighborSolicitation{
+		TargetAddress: hi.GatewayIP.IPAddr().IP,
+		Options: layers.ICMPv6Options{
+			{
+				Type: layers.ICMPv6OptSourceAddress,
+				Data: []byte(hi.HostMAC),
+			},
+		},
+	}
+
+	return gopacket.SerializeLayers(w, packetSerializeOpts, &eth, &ip6, &icmp6, &solicit)
+}
 
 // NeighSolicitation contains information from an ICMPv6 neighbor solicitation packet.
 type NeighSolicitation struct {
@@ -46,9 +129,9 @@ func (ns NeighSolicitation) String() string {
 }
 
 // Respond creates an ICMPv6 neighbor advertisement packet.
-func (ns NeighSolicitation) Respond(w gopacket.SerializeBuffer, hostMAC net.HardwareAddr) error {
+func (ns NeighSolicitation) Respond(w gopacket.SerializeBuffer, hi HostInfo) error {
 	eth := layers.Ethernet{
-		SrcMAC:       hostMAC,
+		SrcMAC:       hi.HostMAC,
 		DstMAC:       net.HardwareAddr(ns.RouterMAC[:]),
 		EthernetType: layers.EthernetTypeIPv6,
 	}
@@ -66,21 +149,22 @@ func (ns NeighSolicitation) Respond(w gopacket.SerializeBuffer, hostMAC net.Hard
 	}
 	icmp6.SetNetworkLayerForChecksum(&ip6)
 
+	var advertFlags uint8 = 0x80 | 0x40 // router, solicited
+	if ns.DestIP.IsMulticast() {
+		advertFlags |= 0x20 // override
+	}
 	advert := layers.ICMPv6NeighborAdvertisement{
-		Flags:         0x80 | 0x40, // router, solicited
+		Flags:         advertFlags,
 		TargetAddress: ns.TargetIP.IPAddr().IP,
 		Options: layers.ICMPv6Options{
 			{
 				Type: layers.ICMPv6OptTargetAddress,
-				Data: []byte(hostMAC),
+				Data: []byte(hi.HostMAC),
 			},
 		},
 	}
 
-	return gopacket.SerializeLayers(w, gopacket.SerializeOptions{
-		FixLengths:       true,
-		ComputeChecksums: true,
-	}, &eth, &ip6, &icmp6, &advert)
+	return gopacket.SerializeLayers(w, packetSerializeOpts, &eth, &ip6, &icmp6, &advert)
 }
 
 // CaptureNeighSolicitation captures ICMPv6 neighbor solicitation packets.
