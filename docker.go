@@ -57,25 +57,26 @@ func dockerRefreshNetwork(name string, isNewContainer func(ctID string) bool) {
 	var newIPs []netaddr.IP
 	for ctID, ct := range network.Containers {
 		prefix, _ := netaddr.ParseIPPrefix(ct.IPv6Address)
-		b.Add(prefix.IP)
-		ipAddrs = append(ipAddrs, prefix.IP.String())
+		ip := prefix.IP()
+		b.Add(ip)
+		ipAddrs = append(ipAddrs, ip.String())
 
 		if isNewContainer(ctID) {
-			newIPs = append(newIPs, prefix.IP)
+			newIPs = append(newIPs, ip)
 		}
 	}
 	dockerLogger.Info("active IPs updated",
 		zap.String("network", network.Name),
 		zap.Strings("ip", ipAddrs),
 	)
-	dockerNetIPSets[network.ID] = b.IPSet()
+	dockerNetIPSets[network.ID], _ = b.IPSet()
 
 	for net, ipset := range dockerNetIPSets {
 		if net != network.ID {
 			b.AddSet(ipset)
 		}
 	}
-	dockerActiveIPs = b.IPSet()
+	dockerActiveIPs, _ = b.IPSet()
 
 	for _, ip := range newIPs {
 		dockerNewIP <- ip

@@ -62,7 +62,10 @@ var app = &cli.App{
 			}
 			ipset.AddPrefix(prefix)
 		}
-		targetSubnets = ipset.IPSet()
+		targetSubnets, e = ipset.IPSet()
+		if e != nil {
+			return cli.Exit(e, 1)
+		}
 
 		dockerNetworks = c.StringSlice("docker-network")
 
