@@ -1,5 +1,7 @@
 # IPv6 Neighbor Discovery Responder
 
+[![GitHub Workflow Status](https://img.shields.io/github/workflow/status/yoursunny/ndpresponder/build)](https://github.com/yoursunny/ndpresponder/actions) [![GitHub code size](https://img.shields.io/github/languages/code-size/yoursunny/ndpresponder?style=flat&logo=GitHub)](https://github.com/yoursunny/ndpresponder)
+
 **ndpresponder** is a Go program that listens for ICMPv6 neighbor solicitations on a network interface and responds with neighbor advertisements, as described in [RFC 4861](https://tools.ietf.org/html/rfc4861) - IPv6 Neighbor Discovery Protocol.
 
 This program differs from [ndppd - NDP Proxy Daemon](https://github.com/DanielAdolfsson/ndppd) in that the source IPv6 address of neighbor advertisement is set to the same value as the target address in the neighbor solicitation.
@@ -20,7 +22,7 @@ This program is also available as a Docker container:
 
 ```bash
 docker build -t ndpresponder 'github.com/yoursunny/ndpresponder#main'
-docker run -d --name ndpresponder --network host ndpresponder [ARGUMENTS]
+docker run -d --name ndpresponder --network host ndpresponder [arguments]
 ```
 
 ## Static Mode
@@ -60,3 +62,15 @@ docker run -d \
 * `-i` flag specifies the network interface name.
 * `-N` flag specifies the Docker network name.
   You may repeat this flag to specify multiple networks.
+
+## Other Options
+
+You may change log level of this program by setting the `NDPRESPONDER_LOG` environment variable.
+Acceptable values are `DEBUG`, `INFO`, `WARN`, `ERROR`, and `FATAL`.
+
+Sample command:
+
+```bash
+sudo NDPRESPONDER_LOG=WARN ndpresponder [arguments]
+docker run -e NDPRESPONDER_LOG=WARN [other arguments]
+```

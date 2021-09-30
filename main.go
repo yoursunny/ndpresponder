@@ -15,10 +15,15 @@ import (
 )
 
 var logger = func() *zap.Logger {
+	var lvl zapcore.Level
+	if environ, ok := os.LookupEnv("NDPRESPONDER_LOG"); ok {
+		lvl.Set(environ)
+	}
+
 	core := zapcore.NewCore(
 		zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()),
 		os.Stderr,
-		zap.DebugLevel,
+		lvl,
 	)
 	return zap.New(core)
 }()
