@@ -1,8 +1,8 @@
-FROM golang:1.17-bullseye AS build
+FROM golang:1.18-bullseye AS build
 WORKDIR /app
 COPY . .
-RUN go build .
+RUN env GOBIN=/build go install .
 
 FROM debian:bullseye
-COPY --from=build /app/ndpresponder /ndpresponder
+COPY --from=build /build/* /
 ENTRYPOINT ["/ndpresponder"]

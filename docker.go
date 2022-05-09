@@ -10,7 +10,7 @@ var (
 	dockerLogger    = logger.Named("Docker")
 	dockerNetworks  []string
 	dockerClient    *docker.Client
-	dockerNetIPSets = make(map[string]*netaddr.IPSet)
+	dockerNetIPSets = map[string]*netaddr.IPSet{}
 	dockerActiveIPs = &netaddr.IPSet{}
 	dockerNewIP     = make(chan netaddr.IP, 64)
 )
