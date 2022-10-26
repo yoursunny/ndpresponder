@@ -27,7 +27,7 @@ func gatherHostInfo() (hi HostInfo, e error) {
 		logEntry.Error("netlink.NewHandle error", zap.Error(e))
 		return hi, nil
 	}
-	defer nl.Delete()
+	defer nl.Close()
 
 	link, e := nl.LinkByIndex(netif.Index)
 	if e != nil {
@@ -51,7 +51,6 @@ func gatherHostInfo() (hi HostInfo, e error) {
 	logEntry.Info("found gateway", zap.Stringer("gateway", hi.GatewayIP))
 
 	var gatewayNeigh *netlink.Neigh
-GWN:
 	for {
 		neighs, e := nl.NeighList(netif.Index, unix.AF_INET6)
 		if e != nil {
@@ -60,22 +59,31 @@ GWN:
 		}
 		for _, neigh := range neighs {
 			ip, _ := netaddr.FromStdIP(neigh.IP)
-			if ip == hi.GatewayIP && len(neigh.HardwareAddr) == 6 &&
-				(neigh.State == unix.NUD_REACHABLE || neigh.State == unix.NUD_NOARP) {
+			if ip != hi.GatewayIP || len(neigh.HardwareAddr) != 6 {
+				continue
+			}
+			switch neigh.State {
+			case unix.NUD_REACHABLE, unix.NUD_NOARP:
 				gatewayNeigh = &neigh
-				break GWN
+				goto NEIGH_SET
+			case unix.NUD_PERMANENT:
+				goto NEIGH_SKIP
 			}
 		}
+
 		exec.Command("/usr/bin/ping", "-c", "1", hi.GatewayIP.String()).Run()
 		logEntry.Debug("waiting for gateway neigh entry")
 		time.Sleep(time.Second)
 	}
+
+NEIGH_SET:
 	gatewayNeigh.State = unix.NUD_NOARP
 	if e = nl.NeighSet(gatewayNeigh); e != nil {
 		logEntry.Error("netlink.NeighSet error", zap.Error(e))
 	} else {
 		logEntry.Info("netlink.NeighSet OK", zap.Stringer("lladdr", gatewayNeigh.HardwareAddr))
 	}
+NEIGH_SKIP:
 
 	return hi, nil
 }

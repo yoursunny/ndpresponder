@@ -35,7 +35,8 @@ var (
 )
 
 var app = &cli.App{
-	Name: "ndpresponder",
+	Name:        "ndpresponder",
+	Description: "IPv6 Neighbor Discovery Responder",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:     "ifname",
@@ -54,6 +55,7 @@ var app = &cli.App{
 			Usage:   "Docker network name",
 		},
 	},
+	HideHelpCommand: true,
 	Before: func(c *cli.Context) (e error) {
 		if netif, e = net.InterfaceByName(c.String("ifname")); e != nil {
 			return cli.Exit(e, 1)
