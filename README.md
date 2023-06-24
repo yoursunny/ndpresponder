@@ -1,6 +1,6 @@
 # IPv6 Neighbor Discovery Responder
 
-[![GitHub Workflow Status](https://img.shields.io/github/workflow/status/yoursunny/ndpresponder/build)](https://github.com/yoursunny/ndpresponder/actions) [![GitHub code size](https://img.shields.io/github/languages/code-size/yoursunny/ndpresponder?style=flat&logo=GitHub)](https://github.com/yoursunny/ndpresponder)
+[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/yoursunny/ndpresponder/build.yml)](https://github.com/yoursunny/ndpresponder/actions) [![GitHub code size](https://img.shields.io/github/languages/code-size/yoursunny/ndpresponder?style=flat&logo=GitHub)](https://github.com/yoursunny/ndpresponder)
 
 **ndpresponder** is a Go program that listens for ICMPv6 neighbor solicitations on a network interface and responds with neighbor advertisements, as described in [RFC 4861](https://tools.ietf.org/html/rfc4861) - IPv6 Neighbor Discovery Protocol.
 
@@ -15,7 +15,7 @@ It requires both Go compiler and C compiler.
 You can compile and install this program with:
 
 ```bash
-go install github.com/yoursunny/ndpresponder@latest
+go install github.com/yoursunny/ndpresponder@main
 ```
 
 This program is also available as a Docker container:
