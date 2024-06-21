@@ -2,19 +2,19 @@ package main
 
 import (
 	"net"
+	"net/netip"
 	"os/exec"
 	"time"
 
 	"github.com/vishvananda/netlink"
 	"go.uber.org/zap"
 	"golang.org/x/sys/unix"
-	"inet.af/netaddr"
 )
 
 // HostInfo contains address information of the host machine.
 type HostInfo struct {
 	HostMAC   net.HardwareAddr
-	GatewayIP netaddr.IP
+	GatewayIP netip.Addr
 }
 
 func gatherHostInfo() (hi HostInfo, e error) {
@@ -41,10 +41,10 @@ func gatherHostInfo() (hi HostInfo, e error) {
 	}
 	for _, route := range routes {
 		if route.Dst == nil {
-			hi.GatewayIP, _ = netaddr.FromStdIP(route.Gw)
+			hi.GatewayIP, _ = netip.AddrFromSlice(route.Gw)
 		}
 	}
-	if hi.GatewayIP.IsZero() {
+	if !hi.GatewayIP.IsValid() {
 		logEntry.Warn("no default gateway")
 		return hi, nil
 	}
@@ -58,7 +58,7 @@ func gatherHostInfo() (hi HostInfo, e error) {
 			return hi, nil
 		}
 		for _, neigh := range neighs {
-			ip, _ := netaddr.FromStdIP(neigh.IP)
+			ip, _ := netip.AddrFromSlice(neigh.IP)
 			if ip != hi.GatewayIP || len(neigh.HardwareAddr) != 6 {
 				continue
 			}

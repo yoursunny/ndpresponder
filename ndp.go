@@ -7,11 +7,11 @@ import (
 	"io"
 	"math"
 	"net"
+	"net/netip"
 
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 	"golang.org/x/net/bpf"
-	"inet.af/netaddr"
 )
 
 // tcpdump -dd 'icmp6 && ip6[40]==135'
@@ -36,7 +36,7 @@ var solicitTypeCode = layers.CreateICMPv6TypeCode(layers.ICMPv6TypeNeighborSolic
 var advertTypeCode = layers.CreateICMPv6TypeCode(layers.ICMPv6TypeNeighborAdvertisement, 0)
 
 // Gratuitous creates a gratuitous ICMPv6 neighbor solicitation packet.
-func Gratuitous(w gopacket.SerializeBuffer, hi HostInfo, targetIP netaddr.IP) error {
+func Gratuitous(w gopacket.SerializeBuffer, hi HostInfo, targetIP netip.Addr) error {
 	ip16 := targetIP.As16()
 	eth := layers.Ethernet{
 		SrcMAC:       hi.HostMAC,
@@ -62,7 +62,7 @@ func Gratuitous(w gopacket.SerializeBuffer, hi HostInfo, targetIP netaddr.IP) er
 	nonce := make([]byte, 6)
 	rand.Read(nonce)
 	solicit := layers.ICMPv6NeighborSolicitation{
-		TargetAddress: targetIP.IPAddr().IP,
+		TargetAddress: targetIP.AsSlice(),
 		Options: layers.ICMPv6Options{
 			{
 				Type: 0x0E,
@@ -76,7 +76,7 @@ func Gratuitous(w gopacket.SerializeBuffer, hi HostInfo, targetIP netaddr.IP) er
 }
 
 // Solicit creates an ICMPv6 neighbor solicitation packet.
-func Solicit(w gopacket.SerializeBuffer, hi HostInfo, sourceIP netaddr.IP) error {
+func Solicit(w gopacket.SerializeBuffer, hi HostInfo, sourceIP netip.Addr) error {
 	eth := layers.Ethernet{
 		SrcMAC:       hi.HostMAC,
 		DstMAC:       net.HardwareAddr{0x33, 0x33, 0xFF, 0x00, 0x00, 0x01},
@@ -87,7 +87,7 @@ func Solicit(w gopacket.SerializeBuffer, hi HostInfo, sourceIP netaddr.IP) error
 		0x00, 0x00, 0x00, 0x01, 0xFF, 0x00, 0x00, 0x01}
 	ip6 := layers.IPv6{
 		Version:    6,
-		SrcIP:      sourceIP.IPAddr().IP,
+		SrcIP:      sourceIP.AsSlice(),
 		DstIP:      dstIP,
 		NextHeader: layers.IPProtocolICMPv6,
 		HopLimit:   math.MaxUint8,
@@ -101,7 +101,7 @@ func Solicit(w gopacket.SerializeBuffer, hi HostInfo, sourceIP netaddr.IP) error
 	nonce := make([]byte, 6)
 	rand.Read(nonce)
 	solicit := layers.ICMPv6NeighborSolicitation{
-		TargetAddress: hi.GatewayIP.IPAddr().IP,
+		TargetAddress: hi.GatewayIP.AsSlice(),
 		Options: layers.ICMPv6Options{
 			{
 				Type: layers.ICMPv6OptSourceAddress,
@@ -116,9 +116,9 @@ func Solicit(w gopacket.SerializeBuffer, hi HostInfo, sourceIP netaddr.IP) error
 // NeighSolicitation contains information from an ICMPv6 neighbor solicitation packet.
 type NeighSolicitation struct {
 	RouterMAC [6]byte
-	RouterIP  netaddr.IP
-	DestIP    netaddr.IP
-	TargetIP  netaddr.IP
+	RouterIP  netip.Addr
+	DestIP    netip.Addr
+	TargetIP  netip.Addr
 }
 
 func (ns NeighSolicitation) String() string {
@@ -138,8 +138,8 @@ func (ns NeighSolicitation) Respond(w gopacket.SerializeBuffer, hi HostInfo) err
 
 	ip6 := layers.IPv6{
 		Version:    6,
-		SrcIP:      ns.TargetIP.IPAddr().IP,
-		DstIP:      ns.RouterIP.IPAddr().IP,
+		SrcIP:      ns.TargetIP.AsSlice(),
+		DstIP:      ns.RouterIP.AsSlice(),
 		NextHeader: layers.IPProtocolICMPv6,
 		HopLimit:   math.MaxUint8,
 	}
@@ -155,7 +155,7 @@ func (ns NeighSolicitation) Respond(w gopacket.SerializeBuffer, hi HostInfo) err
 	}
 	advert := layers.ICMPv6NeighborAdvertisement{
 		Flags:         advertFlags,
-		TargetAddress: ns.TargetIP.IPAddr().IP,
+		TargetAddress: ns.TargetIP.AsSlice(),
 		Options: layers.ICMPv6Options{
 			{
 				Type: layers.ICMPv6OptTargetAddress,
@@ -192,9 +192,9 @@ func CaptureNeighSolicitation(src gopacket.ZeroCopyPacketDataSource) <-chan Neig
 			if len(decoded) == 4 && decoded[3] == layers.LayerTypeICMPv6NeighborSolicitation {
 				ns := NeighSolicitation{}
 				copy(ns.RouterMAC[:], eth.SrcMAC)
-				ns.RouterIP, _ = netaddr.FromStdIP(ip6.SrcIP)
-				ns.DestIP, _ = netaddr.FromStdIP(ip6.DstIP)
-				ns.TargetIP, _ = netaddr.FromStdIP(solicit.TargetAddress)
+				ns.RouterIP, _ = netip.AddrFromSlice(ip6.SrcIP)
+				ns.DestIP, _ = netip.AddrFromSlice(ip6.DstIP)
+				ns.TargetIP, _ = netip.AddrFromSlice(solicit.TargetAddress)
 				ch <- ns
 			}
 		}

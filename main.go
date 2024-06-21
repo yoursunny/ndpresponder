@@ -3,6 +3,7 @@ package main
 import (
 	"math/rand"
 	"net"
+	"net/netip"
 	"os"
 	"time"
 
@@ -11,7 +12,7 @@ import (
 	"github.com/urfave/cli/v2"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"inet.af/netaddr"
+	"go4.org/netipx"
 )
 
 var logger = func() *zap.Logger {
@@ -30,7 +31,7 @@ var logger = func() *zap.Logger {
 
 var (
 	netif         *net.Interface
-	targetSubnets *netaddr.IPSet
+	targetSubnets *netipx.IPSet
 	handle        *afpacket.TPacket
 )
 
@@ -61,9 +62,9 @@ var app = &cli.App{
 			return cli.Exit(e, 1)
 		}
 
-		var ipset netaddr.IPSetBuilder
+		var ipset netipx.IPSetBuilder
 		for _, subnet := range c.StringSlice("subnet") {
-			prefix, e := netaddr.ParseIPPrefix(subnet)
+			prefix, e := netip.ParsePrefix(subnet)
 			if e != nil {
 				return cli.Exit(e, 1)
 			}
@@ -130,7 +131,7 @@ var app = &cli.App{
 				logEntry.Info("GRATUITOUS")
 				h.WritePacketData(sbuf.Bytes())
 
-				if hi.GatewayIP.IsZero() {
+				if !hi.GatewayIP.IsValid() {
 					break
 				}
 				if e := Solicit(sbuf, hi, ip); e != nil {

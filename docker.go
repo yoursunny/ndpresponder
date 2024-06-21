@@ -1,18 +1,20 @@
 package main
 
 import (
+	"net/netip"
+
 	docker "github.com/fsouza/go-dockerclient"
 	"go.uber.org/zap"
-	"inet.af/netaddr"
+	"go4.org/netipx"
 )
 
 var (
 	dockerLogger    = logger.Named("Docker")
 	dockerNetworks  []string
 	dockerClient    *docker.Client
-	dockerNetIPSets = map[string]*netaddr.IPSet{}
-	dockerActiveIPs = &netaddr.IPSet{}
-	dockerNewIP     = make(chan netaddr.IP, 64)
+	dockerNetIPSets = map[string]*netipx.IPSet{}
+	dockerActiveIPs = &netipx.IPSet{}
+	dockerNewIP     = make(chan netip.Addr, 64)
 )
 
 func dockerListen() (e error) {
@@ -52,12 +54,12 @@ func dockerRefreshNetwork(name string, isNewContainer func(ctID string) bool) {
 		return
 	}
 
-	var b netaddr.IPSetBuilder
+	var b netipx.IPSetBuilder
 	var ipAddrs []string
-	var newIPs []netaddr.IP
+	var newIPs []netip.Addr
 	for ctID, ct := range network.Containers {
-		prefix, _ := netaddr.ParseIPPrefix(ct.IPv6Address)
-		ip := prefix.IP()
+		prefix, _ := netip.ParsePrefix(ct.IPv6Address)
+		ip := prefix.Addr()
 		b.Add(ip)
 		ipAddrs = append(ipAddrs, ip.String())
 
