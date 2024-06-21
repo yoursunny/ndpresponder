@@ -11,7 +11,6 @@ See my [blog post](https://yoursunny.com/t/2021/ndpresponder/) for more informat
 ## Installation
 
 This program is written in Go.
-It requires both Go compiler and C compiler.
 You can compile and install this program with:
 
 ```bash
@@ -21,8 +20,8 @@ go install github.com/yoursunny/ndpresponder@main
 This program is also available as a Docker container:
 
 ```bash
-docker build -t ndpresponder 'github.com/yoursunny/ndpresponder#main'
-docker run -d --name ndpresponder --network host ndpresponder [arguments]
+docker build -t localhost/ndpresponder 'github.com/yoursunny/ndpresponder#main'
+docker run -d --name localhost/ndpresponder --network host ndpresponder [arguments]
 ```
 
 ## Static Mode
@@ -56,7 +55,7 @@ docker run -d \
   -v /var/run/docker.sock:/var/run/docker.sock:ro \
   --cap-drop=ALL --cap-add=NET_RAW --cap-add=NET_ADMIN \
   --network host --name ndpresponder \
-  ndpresponder -i eth0 -N ipv6exposed
+  localhost/ndpresponder -i eth0 -N ipv6exposed
 ```
 
 * `-i` flag specifies the network interface name.
