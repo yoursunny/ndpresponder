@@ -14,7 +14,7 @@ This program is written in Go.
 You can compile and install this program with:
 
 ```bash
-go install github.com/yoursunny/ndpresponder@main
+env CGO_ENABLED=0 go install github.com/yoursunny/ndpresponder@main
 ```
 
 This program is also available as a Docker container:

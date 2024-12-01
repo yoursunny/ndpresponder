@@ -1,4 +1,4 @@
-FROM golang:1.22-alpine3.20 AS build
+FROM golang:1.23-alpine3.20 AS build
 WORKDIR /app
 COPY . .
 RUN env CGO_ENABLED=0 GOBIN=/build go install .
