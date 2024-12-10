@@ -34,13 +34,19 @@ func gatherHostInfo() (hi HostInfo, e error) {
 		logEntry.Error("netlink.LinkByIndex error", zap.Error(e))
 		return hi, nil
 	}
+
 	routes, e := nl.RouteList(link, unix.AF_INET6)
 	if e != nil {
 		logEntry.Error("netlink.RouteList error", zap.Error(e))
 		return hi, nil
 	}
+
 	for _, route := range routes {
-		if route.Dst == nil {
+		maskLen := 0
+		if route.Dst != nil {
+			maskLen, _ = route.Dst.Mask.Size()
+		}
+		if maskLen == 0 {
 			hi.GatewayIP, _ = netip.AddrFromSlice(route.Gw)
 		}
 	}
