@@ -1,11 +1,9 @@
 package main
 
 import (
-	"math/rand"
 	"net"
 	"net/netip"
 	"os"
-	"time"
 
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/afpacket"
@@ -152,6 +150,5 @@ var app = &cli.App{
 }
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
 	app.Run(os.Args)
 }

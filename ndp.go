@@ -105,7 +105,7 @@ func Solicit(w gopacket.SerializeBuffer, hi HostInfo, sourceIP netip.Addr) error
 		Options: layers.ICMPv6Options{
 			{
 				Type: layers.ICMPv6OptSourceAddress,
-				Data: []byte(hi.HostMAC),
+				Data: hi.HostMAC,
 			},
 		},
 	}
@@ -132,7 +132,7 @@ func (ns NeighSolicitation) String() string {
 func (ns NeighSolicitation) Respond(w gopacket.SerializeBuffer, hi HostInfo) error {
 	eth := layers.Ethernet{
 		SrcMAC:       hi.HostMAC,
-		DstMAC:       net.HardwareAddr(ns.RouterMAC[:]),
+		DstMAC:       ns.RouterMAC[:],
 		EthernetType: layers.EthernetTypeIPv6,
 	}
 
@@ -159,7 +159,7 @@ func (ns NeighSolicitation) Respond(w gopacket.SerializeBuffer, hi HostInfo) err
 		Options: layers.ICMPv6Options{
 			{
 				Type: layers.ICMPv6OptTargetAddress,
-				Data: []byte(hi.HostMAC),
+				Data: hi.HostMAC,
 			},
 		},
 	}
