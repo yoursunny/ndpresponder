@@ -39,6 +39,8 @@ sudo ndpresponder -i eth0 -n 2001:db8:3988:486e:ff2f:add3:31e3:7b00/120
 * `-n` flag specifies the IPv6 subnet to respond to.
   You may repeat this flag to specify multiple subnets.
 
+See [ndpresponder.service](ndpresponder.service) for a sample systemd unit file.
+
 ## Docker Network Mode
 
 The program can respond to neighbor solicitations for assigned addresses in Docker networks.
