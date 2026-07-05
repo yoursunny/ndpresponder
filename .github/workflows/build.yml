@@ -7,17 +7,17 @@ on:
 permissions: {}
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     env:
       CGO_ENABLED: 0
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
       - run: go build .
   docker:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/build-push-action@v5
+      - uses: actions/checkout@v7
+      - uses: docker/build-push-action@v7
