@@ -83,7 +83,7 @@ func gatherHostInfo() (hi HostInfo, e error) {
 	}
 
 NEIGH_SET:
-	gatewayNeigh.State = unix.NUD_NOARP
+	gatewayNeigh.State = unix.NUD_PERMANENT
 	if e = nl.NeighSet(gatewayNeigh); e != nil {
 		logEntry.Error("netlink.NeighSet error", zap.Error(e))
 	} else {
